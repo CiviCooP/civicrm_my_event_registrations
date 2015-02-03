@@ -1,0 +1,76 @@
+<?php
+
+function civicrm_my_event_registrations_views_api() {
+  return array('api' => 3.0);
+}
+
+function civicrm_my_event_registrations_views_default_views() {
+  $files = file_scan_directory(drupal_get_path('module', 'civicrm_my_event_registrations'). '/views', '/.inc/');
+  foreach ($files as $filepath => $file) {
+    try {
+      require $filepath;
+      if (isset($view)) {
+        $views[$view->name] = $view;
+      }
+    } catch (Exception $e) {
+      //do nothing
+    }
+  }
+  return $views;
+}
+
+function civicrm_my_event_registrations_cancel_form($form, &$form_state, $participant_id) {
+  civicrm_initialize();
+  $participant = civicrm_api3('Participant', 'getsingle', array('participant_id' => $participant_id));
+
+  $form['participant_id']['#type'] = 'hidden';
+  $form['participant_id']['#name'] = 'participant_id';
+  $form['participant_id']['#value'] = $participant_id;
+
+  $form['warning']['#type'] = 'markup';
+  $form['warning']['#markup'] = '<p><strong>'.t('Are you sure?').'</strong></p>';
+
+  $form['event_subject']['#type'] = 'markup';
+  $form['event_subject']['#markup'] = '<p>'.t('To cancel your registration for: ').$participant['event_title'].'</p>';
+
+  $form['submit_button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel my registration'),
+  );
+  return $form;
+}
+
+function civicrm_my_event_registrations_cancel_form_submit($form, &$form_state) {
+  $participant_id = $form_state['values']['participant_id'];
+  $cancel_id = civicrm_api3('ParticipantStatusType', 'getvalue', array('name' => 'Cancelled', 'return' => 'id'));
+  civicrm_api3('Participant', 'create', array('participant_id' => $participant_id, 'participant_status_id' => $cancel_id));
+}
+
+function civicrm_my_event_registrations_menu() {
+  $items = array();
+  $items['my-event-registrations/cancel-registration/%'] = array( //this creates a URL that will call this form at "examples/form-example"
+      'title' => 'Cancel registration', //page title
+      'description' => 'Cancel event registration',
+      'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+      'page arguments' => array('civicrm_my_event_registrations_cancel_form', 2), //put the name of the form here
+      'access callback' => 'civicrm_my_event_registrations_user_has_cancel_access',
+      'access arguments' => array(2), // arg 1 loads the user, arg 2 is the role name
+  );
+  return $items;
+}
+
+function civicrm_my_event_registrations_user_has_cancel_access($participant_id) {
+  global $user;
+  try {
+    civicrm_initialize();
+    $participant = civicrm_api3('Participant', 'getsingle', array('participant_id' => $participant_id));
+    $user_id = civicrm_api3('UFMatch', 'getvalue', array('contact_id' => $participant['contact_id'], 'return' => 'uf_id'));
+    if ($user_id == $user->uid) {
+      return true;
+    }
+  } catch (Exception $e) {
+    //do nothing
+  }
+  return false;
+
+}

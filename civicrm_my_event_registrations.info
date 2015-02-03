@@ -1,0 +1,6 @@
+name = CiviCRM My Event registrations
+description = Shows an overview of events for which a user is registered and an option to cancel
+core = 7.x
+package = CiviCRM
+dependencies[] = civicrm (>=4.4)
+dependencies[] = views
